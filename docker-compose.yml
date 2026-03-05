@@ -1,0 +1,45 @@
+services:
+  postgres-lab:
+    image: pgvector/pgvector:pg16
+    container_name: postgres_ai_lab
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: ai_mastery_lab
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-ai-lab:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus_ai
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana_ai_lab
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-ai:/var/lib/grafana
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: loki_ai
+    ports:
+      - "3101:3100"
+
+volumes:
+  postgres-ai-lab:
+  grafana-ai:
