@@ -42,7 +42,9 @@ Three layers (routers -> services -> repositories) + agent layer (graph -> nodes
 ```
 app/
 ├── main.py                  # FastAPI app entry point
-├── config.py                # Settings via pydantic-settings
+├── config/
+│   ├── settings.py          # Settings via pydantic-settings (@lru_cache singleton)
+│   └── database.py          # Async engine + session factory + get_db dependency
 ├── routers/                 # REST endpoints (equivalente controllers/)
 ├── services/                # Business logic
 ├── repositories/            # Data access (SQLAlchemy async)
@@ -56,10 +58,12 @@ app/
 │   ├── embeddings.py        # Embedding generation
 │   ├── chunker.py           # Document chunking
 │   └── retriever.py         # Vector similarity search
-└── database.py              # Async engine + session factory
+└── exceptions/
+    └── handlers.py          # Custom exceptions + global error handlers
 tests/
-├── unit/                    # Testes com mock
-└── integration/             # Testes com Testcontainers + respx
+├── conftest.py              # Testcontainers fixtures (session-scoped loop)
+├── unit/                    # Testes com mock (AsyncMock)
+└── integration/             # Testes com Testcontainers + httpx AsyncClient
 scripts/
 └── ingest.py                # Ingestao de documentos para RAG
 ```
@@ -105,6 +109,17 @@ GitHub Actions pipeline at `.github/workflows/ci.yml`:
 
 ## Testing
 
-- **Unit tests** (`tests/unit/`): mock de dependencias, sem I/O externo
-- **Integration tests** (`tests/integration/`): Testcontainers (PostgreSQL real), respx (mock HTTP para LLM)
+- **Unit tests** (`tests/unit/`): mock de dependencias com `AsyncMock`, sem I/O externo
+- **Integration tests** (`tests/integration/`): Testcontainers (PostgreSQL real), httpx AsyncClient contra FastAPI in-memory
 - **Coverage**: pytest-cov com relatorio HTML
+- **Event loop**: `asyncio_default_test_loop_scope = "session"` — todos os testes compartilham o mesmo event loop (necessario para asyncpg + Testcontainers)
+- **DB override**: `app.dependency_overrides[get_db]` substitui a sessao real pela do Testcontainers
+
+## Exception Handling
+
+Custom exceptions mapeadas para HTTP status codes:
+- `AccountNotFoundException` → 404
+- `DuplicateDocumentException` → 409
+- `InsufficientBalanceException` → 400
+- `RequestValidationError` → 422 (Pydantic)
+- Catch-all `Exception` → 500
